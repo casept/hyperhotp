@@ -2,6 +2,7 @@
 
 #include <libusb-1.0/libusb.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "log.h"
@@ -63,9 +64,8 @@ static libusb_device_handle *usb_find_and_init_device(void) {
         libusb_device_handle *handle;
         err = libusb_open(found, &handle);
         if (err != 0) {
-            log_fatal(
-                "Device could not be opened! Perhaps you need to adjust udev rules (Linux) or run with more "
-                "privileges?");
+            printf("[FATAL] Device could not be opened! Libusb says \"%s\"\n", libusb_strerror(err));
+            log_fatal("Bailing out");
         }
 
         // Try to detach kernel driver
