@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 void log_fatal(const char* msg);
+void log_fatal_libusb(const char* msg, const int libusb_err);
 
 void log_debug(const char* msg);
 

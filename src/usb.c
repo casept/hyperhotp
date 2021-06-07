@@ -64,8 +64,7 @@ static libusb_device_handle *usb_find_and_init_device(void) {
         libusb_device_handle *handle;
         err = libusb_open(found, &handle);
         if (err != 0) {
-            printf("[FATAL] Device could not be opened! Libusb says \"%s\"\n", libusb_strerror(err));
-            log_fatal("Bailing out");
+            log_fatal_libusb("Failed to open device", err);
         }
 
         // Try to detach kernel driver
@@ -77,7 +76,7 @@ static libusb_device_handle *usb_find_and_init_device(void) {
         // Claim FIDO interface from kernel
         err = libusb_claim_interface(handle, HYPERHOTP_IFACE_NUM);
         if (err != 0) {
-            log_fatal("Failed to claim device from kernel");
+            log_fatal_libusb("Failed to claim device from kernel", err);
         }
 
         libusb_free_device_list(list, true);
@@ -94,14 +93,14 @@ static libusb_device_handle *usb_find_and_init_device(void) {
 libusb_device_handle *usb_init(void) {
     int err = libusb_init(NULL);
     if (err != 0) {
-        log_fatal("Failed to init libusb");
+        log_fatal_libusb("Failed to init libusb", err);
     }
 
     // Configure debugging
 #ifdef DEBUG
     err = libusb_set_option(NULL, LIBUSB_OPTION_LOG_LEVEL, LIBUSB_LOG_LEVEL_WARNING);
     if (err != 0) {
-        log_fatal("Failed to set libusb log level");
+        log_fatal_libusb("Failed to set libusb log level", err);
     }
     libusb_set_log_cb(NULL, log_libusb_callback, LIBUSB_LOG_CB_GLOBAL);
 #endif
@@ -118,11 +117,11 @@ void usb_send(libusb_device_handle *handle, const uint8_t *buf, const uint8_t bu
     int err = libusb_interrupt_transfer(handle, HYPERHOTP_OUT_ENDPOINT, (unsigned char *)buf, buf_len, &transferred,
                                         0);  // NOLINT (This is a send, so libusb doesn't write)
     if (err != 0) {
-        log_fatal("Failed to perform interrupt transfer (libusb error)");
+        log_fatal_libusb("Failed to perform interrupt transfer", err);
     }
     // TODO: Build reliable transmission abstraction if needed
     if (transferred != buf_len) {
-        log_fatal("Failed to perform interrupt transfer (not all data got sent)");
+        log_fatal("Failed to perform interrupt transfer: Not all data got sent");
     }
 }
 
@@ -131,11 +130,11 @@ void usb_recv(libusb_device_handle *handle, uint8_t *buf, const uint8_t buf_len)
     // TODO: Timeout
     int err = libusb_interrupt_transfer(handle, HYPERHOTP_IN_ENDPOINT, buf, buf_len, &transferred, 0);
     if (err != 0) {
-        log_fatal("Failed to perform interrupt transfer (libusb error)");
+        log_fatal_libusb("Failed to perform interrupt transfer", err);
     }
     // TODO: Build reliable transmission abstraction if needed
     if (transferred != buf_len) {
-        log_fatal("Failed to perform interrupt transfer (not all data got received)");
+        log_fatal("Failed to perform interrupt transfer: Not all data got received");
     }
     log_received(buf, buf_len);
 }
@@ -143,7 +142,7 @@ void usb_recv(libusb_device_handle *handle, uint8_t *buf, const uint8_t buf_len)
 void usb_cleanup(libusb_device_handle *handle) {
     int err = libusb_release_interface(handle, HYPERHOTP_IFACE_NUM);
     if (err != 0) {
-        log_fatal("Failed to release device interface");
+        log_fatal_libusb("Failed to release device interface", err);
     }
     libusb_close(handle);
     libusb_exit(NULL);

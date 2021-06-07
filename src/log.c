@@ -1,9 +1,16 @@
 #include <libusb-1.0/libusb.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 void log_fatal(const char *msg) {
     fprintf(stderr, "[FATAL] %s\n", msg);
+    fflush(stderr);
+    exit(EXIT_FAILURE);
+}
+
+void log_fatal_libusb(const char *msg, const int libusb_err) {
+    fprintf(stderr, "[FATAL] %s: Libusb says: \"%s\"\n", msg, libusb_strerror(libusb_err));
     fflush(stderr);
     exit(EXIT_FAILURE);
 }
