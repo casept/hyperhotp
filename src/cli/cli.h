@@ -2,7 +2,7 @@
 
 #include <stdbool.h>
 
-#include "hyperhotp.h"
+#include "../hyperhotp.h"
 
 typedef enum {
     CLI_ACTION_INVALID,

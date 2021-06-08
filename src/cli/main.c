@@ -2,11 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "../hyperhotp.h"
+#include "../log.h"
+#include "../u2fhid.h"
+#include "../usb.h"
 #include "cli.h"
-#include "hyperhotp.h"
-#include "log.h"
-#include "u2fhid.h"
-#include "usb.h"
 
 static void check(libusb_device_handle *handle, const FIDOCID cid) {
     char serial[HYPERHOTP_SERIAL_LEN] = {0};
