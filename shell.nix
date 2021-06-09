@@ -10,8 +10,10 @@ in pkgs.mkShell {
     pkgs.gnumake
     pkgs.pkg-config
     pkgs.cmake
+    pkgs.cmake-format
     pkgs.bash
     pkgs.libusb
+    pkgs.gtk4
 
     pkgs.gdb
     pkgs.valgrind

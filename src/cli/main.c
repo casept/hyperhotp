@@ -2,10 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../hyperhotp.h"
-#include "../log.h"
-#include "../u2fhid.h"
-#include "../usb.h"
+#include "../core/hyperhotp.h"
+#include "../core/log.h"
+#include "../core/u2fhid.h"
+#include "../core/usb.h"
 #include "cli.h"
 
 static void check(libusb_device_handle *handle, const FIDOCID cid) {

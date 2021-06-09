@@ -15,11 +15,11 @@ Usage: ./hyperhotp [help|check|reset|program] <8-character serial number> <40-ch
 
 ## Building
 
-This program only depends on `libusb` at runtime, as well as a C compiler supporting at least `c11` and `cmake` at build time. On Unixoid platforms the build is done as usual:
+This program only depends on `libusb` at runtime, as well as a C compiler supporting at least `c11` and `cmake` at build time. `gtk4` is also required if you want to build the GUI. On Unixoid platforms the build is done as usual:
 
 ```shell
 $ mkdir build && cd build
-$ cmake ..
+$ cmake -DBUILD_GUI=ON .. # Alternatively: cmake .. to build without GUI
 $ make -j$(nproc)
 ```
 

@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "../hyperhotp.h"
+#include "../core/hyperhotp.h"
 
 CLIConfig cli_parse(const int argc, const char* argv[]) {
     // TODO: Use getopt or something to make this order-independent
