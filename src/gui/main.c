@@ -1,6 +1,7 @@
 #include <gtk/gtk.h>
 #include <libusb-1.0/libusb.h>
 #include <pthread.h>
+#include <stdlib.h>
 #include <sys/types.h>
 
 #include "../core/hyperhotp.h"
@@ -18,19 +19,107 @@ typedef struct {
     Gui gui;
     libusb_device_handle *device;
     FIDOCID cid;
+    bool retry_requested;
 } GlobalState;
 
 static GlobalState GLOBAL_STATE;
 
-static void gui_perform_programming(GtkWidget *widget, gpointer data) { (void)data; }
-
-static void gui_perform_reset(GtkWidget *button, gpointer data) {
+static void gui_on_perform_programming_requested(GtkWidget *widget, gpointer data) {
+    (void)widget;
     (void)data;
+}
+
+static void gui_on_perform_reset_requested(GtkWidget *button, gpointer data) {
+    (void)data;
+
+    // Setup
     pthread_mutex_lock(&GLOBAL_STATE.mutex);
     gtk_widget_set_sensitive(button, FALSE);
+    gtk_widget_set_sensitive(GLOBAL_STATE.gui.program_button, FALSE);
     gtk_button_set_label(GTK_BUTTON(button), "Resetting, press button on device...");
+    GtkWidget *fidget_spinner = gtk_spinner_new();
+    gtk_spinner_start(GTK_SPINNER(fidget_spinner));
+
+    // Action
     hyperhotp_reset(GLOBAL_STATE.device, GLOBAL_STATE.cid);
+    // TODO: Handle failed reset (offer to retry)
+
+    // Cleanup
+    gtk_spinner_stop(GTK_SPINNER(fidget_spinner));
+    g_object_unref(fidget_spinner);
     gtk_widget_set_sensitive(button, TRUE);
+    gtk_widget_set_sensitive(GLOBAL_STATE.gui.program_button, TRUE);
+    pthread_mutex_unlock(&GLOBAL_STATE.mutex);
+}
+
+static void gui_on_retry_requested(GtkWidget *widget, gpointer data) {
+    (void)data;
+    (void)widget;
+    log_debug("Retry requested");
+    GLOBAL_STATE.retry_requested = true;
+}
+
+static void gui_on_exit_due_to_failure_requested(GtkWidget *widget, gpointer data) {
+    (void)data;
+    (void)widget;
+    pthread_mutex_lock(&GLOBAL_STATE.mutex);
+    gtk_window_destroy(GTK_WINDOW(GLOBAL_STATE.gui.window));
+    pthread_mutex_unlock(&GLOBAL_STATE.mutex);
+    exit(EXIT_FAILURE);
+}
+
+// Queries the current device status.
+static void gui_update_device_status(GtkLabel *label_to_update) {
+    char serial[HYPERHOTP_SERIAL_LEN];
+    pthread_mutex_lock(&GLOBAL_STATE.mutex);
+    int err = hyperhotp_check_programmed(GLOBAL_STATE.device, GLOBAL_STATE.cid, serial);
+    if (err != 0) {
+        // TODO: If this doesn't work, chances are the rest of the app won't work either.
+        // Should we instead show an error window and bail?
+        char *err_str = log_get_last_error_string();
+        GtkWidget *bar = gtk_info_bar_new();
+        GtkWidget *label = gtk_label_new(err_str);
+        gtk_info_bar_add_child(GTK_INFO_BAR(bar), label);
+        log_free_error_string(err_str);
+    } else {
+        gtk_label_set_markup(label_to_update, "<b>Text to be bold</b>");
+    }
+    pthread_mutex_unlock(&GLOBAL_STATE.mutex);
+}
+
+static void gui_init_device_with_retries(GtkWidget *window) {
+    pthread_mutex_lock(&GLOBAL_STATE.mutex);
+    // Try to establish connection to device, show error and offer retry if unsuccessful
+    while (true) {
+        int err = hyperhotp_init(&GLOBAL_STATE.device, GLOBAL_STATE.cid);
+        if (err != 0) {
+            char *err_string = log_get_last_error_string();
+            const GtkDialogFlags flags = GTK_DIALOG_DESTROY_WITH_PARENT | GTK_DIALOG_MODAL;
+            GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), flags, GTK_MESSAGE_ERROR, GTK_BUTTONS_NONE,
+                                                       "%s", err_string);
+            GtkWidget *retry_button = gtk_dialog_add_button(GTK_DIALOG(dialog), "Retry", GTK_RESPONSE_ACCEPT);
+            g_signal_connect(retry_button, "clicked", G_CALLBACK(gui_on_retry_requested), NULL);
+            GtkWidget *exit_button = gtk_dialog_add_button(GTK_DIALOG(dialog), "Exit", GTK_RESPONSE_CLOSE);
+            g_signal_connect(exit_button, "clicked", G_CALLBACK(gui_on_exit_due_to_failure_requested), NULL);
+            gtk_dialog_set_default_response(GTK_DIALOG(dialog), 0);
+            // Destroy dialog on response
+            g_signal_connect(dialog, "response", G_CALLBACK(gtk_window_destroy), NULL);
+            g_signal_connect(dialog, "destroy", G_CALLBACK(gui_on_exit_due_to_failure_requested), NULL);
+
+            gtk_window_present(GTK_WINDOW(dialog));
+            gtk_window_set_modal(GTK_WINDOW(dialog), TRUE);
+            gtk_window_set_transient_for(GTK_WINDOW(dialog), GTK_WINDOW(window));
+
+            // This is no doubt not the cleanest or most efficient way,
+            // but it should be fine as a quick&dirty solution.
+            // We don't care about the false case, because then the app will be closed already.
+            while (!GLOBAL_STATE.retry_requested) {
+            }
+            gtk_window_close(GTK_WINDOW(dialog));
+            gtk_window_destroy(GTK_WINDOW(dialog));
+            log_free_error_string(err_string);
+        }
+    }
     pthread_mutex_unlock(&GLOBAL_STATE.mutex);
 }
 
@@ -41,32 +130,54 @@ static void gui_create(GtkApplication *app, gpointer user_data) {
     // Create window
     GtkWidget *window = gtk_application_window_new(app);
     gtk_window_set_title(GTK_WINDOW(window), "Hyperhotp OTP key programmer");
-    gtk_window_set_default_size(GTK_WINDOW(window), 640, 480);
+    gtk_window_set_default_size(GTK_WINDOW(window), 640, 240);
     GLOBAL_STATE.gui.window = window;
+
+    // Create container for a row-based layout
+    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 20);
+    gtk_window_set_child(GTK_WINDOW(window), box);
+
+    // Create entry field for hotp serial number
+    GtkWidget *serial_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 20);
+    GtkWidget *serial_label = gtk_label_new("HOTP key serial (8 characters):");
+    GtkWidget *serial_entry = gtk_entry_new();
+    gtk_box_append(GTK_BOX(serial_box), serial_label);
+    gtk_box_append(GTK_BOX(serial_box), serial_entry);
+    gtk_box_append(GTK_BOX(box), serial_box);
+
+    // Create entry field for hotp hex key
+    GtkWidget *key_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 20);
+    GtkWidget *key_label = gtk_label_new("HOTP hex key (40 characters):");
+    GtkWidget *key_entry = gtk_entry_new();
+    gtk_box_append(GTK_BOX(key_box), key_label);
+    gtk_box_append(GTK_BOX(key_box), key_entry);
+    gtk_box_append(GTK_BOX(box), key_box);
 
     // Create programming button
     GtkWidget *program_button = gtk_button_new_with_label("Program device");
-    g_signal_connect(program_button, "clicked", G_CALLBACK(gui_perform_programming), NULL);
-    gtk_window_set_child(GTK_WINDOW(window), program_button);
+    g_signal_connect(program_button, "clicked", G_CALLBACK(gui_on_perform_programming_requested), NULL);
+    gtk_box_append(GTK_BOX(box), program_button);
     GLOBAL_STATE.gui.program_button = program_button;
 
     // Create reset button
     GtkWidget *reset_button = gtk_button_new_with_label("Reset device");
-    g_signal_connect(reset_button, "clicked", G_CALLBACK(gui_perform_reset), NULL);
-    gtk_window_set_child(GTK_WINDOW(window), reset_button);
+    g_signal_connect(reset_button, "clicked", G_CALLBACK(gui_on_perform_reset_requested), NULL);
+    gtk_box_append(GTK_BOX(box), reset_button);
     GLOBAL_STATE.gui.reset_button = reset_button;
 
-    // Done
-    pthread_mutex_unlock(&GLOBAL_STATE.mutex);
+    // Done initializing GUI
     gtk_window_present(GTK_WINDOW(window));
+    pthread_mutex_unlock(&GLOBAL_STATE.mutex);
+
+    // Try to initialize the device, showing errors to the user.
+    gui_init_device_with_retries(window);
+    GtkWidget *device_status = gtk_label_new(NULL);
+    gtk_box_append(GTK_BOX(box), device_status);
+    gui_update_device_status(GTK_LABEL(device_status));
 }
 
 int main(int argc, char **argv) {
     pthread_mutex_init(&GLOBAL_STATE.mutex, NULL);
-    pthread_mutex_lock(&GLOBAL_STATE.mutex);
-    GLOBAL_STATE.device = usb_init();
-    hyperhotp_init(GLOBAL_STATE.device, GLOBAL_STATE.cid);
-    pthread_mutex_unlock(&GLOBAL_STATE.mutex);
 
     // Run GUI
     log_debug("Starting GUI");

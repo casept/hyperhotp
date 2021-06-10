@@ -64,7 +64,6 @@ static int usb_find_and_init_device(libusb_device_handle **handle) {
     if (found != NULL) {
         // Open device
         err = libusb_open(found, handle);
-        log_debug("USB handle initialized");
         if (err != 0) {
             log_error_libusb("Failed to open device", err);
             return -1;
