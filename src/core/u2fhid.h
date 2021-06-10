@@ -32,10 +32,10 @@ typedef struct {
 
 FIDOInitPacket fido_craft_packet(const FIDOCID cid, const uint8_t cmd, const uint8_t data_len, const uint8_t *data);
 
-void fido_send_packet(libusb_device_handle *handle, const FIDOInitPacket packet);
+int fido_send_packet(libusb_device_handle *handle, const FIDOInitPacket packet);
 
-FIDOInitPacket fido_recv_packet(libusb_device_handle *handle);
+int fido_recv_packet(libusb_device_handle *handle, FIDOInitPacket *packet);
 
-void fido_alloc_channel(libusb_device_handle *handle, FIDOCID cid);
+int fido_alloc_channel(libusb_device_handle *handle, FIDOCID cid);
 
 bool fido_is_error_packet(const FIDOInitPacket packet);

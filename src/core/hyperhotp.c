@@ -3,44 +3,74 @@
 #include <libusb-1.0/libusb.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <string.h>
 
 #include "log.h"
 #include "u2fhid.h"
+#include "usb.h"
 
-void hyperhotp_init(libusb_device_handle *handle, FIDOCID cid) { fido_alloc_channel(handle, cid); }
+int hyperhotp_init(libusb_device_handle **handle, FIDOCID cid) {
+    int err = usb_init(handle);
+    if (err != 0) {
+        return -1;
+    }
+    err = fido_alloc_channel(*handle, cid);
+    if (err != 0) {
+        return -1;
+    }
+    return 0;
+}
 
 // This seems to be a magic sequence the Windows client executes before every transaction.
-static void hyperhotp_magic(libusb_device_handle *handle, const FIDOCID cid) {
+static int hyperhotp_magic(libusb_device_handle *handle, const FIDOCID cid) {
     // Ping
     log_debug("Sending ping");
     // No idea why this is so large or what the data means
     const uint8_t data[14] = {0x00, 0xa4, 0x04, 0x00, 0x09, 0xd1, 0x56, 0x00, 0x01, 0x32, 0x83, 0x26, 0x01, 0x01};
     const FIDOInitPacket ping = fido_craft_packet(cid, U2FHID_ADPU_RAW, 14, data);
-    fido_send_packet(handle, ping);
+    int err = fido_send_packet(handle, ping);
+    if (err != 0) {
+        return -1;
+    }
 
     // Pong
     log_debug("Waiting for pong");
-    const FIDOInitPacket pong = fido_recv_packet(handle);
+    FIDOInitPacket pong;
+    err = fido_recv_packet(handle, &pong);
+    if (err != 0) {
+        return -1;
+    }
     if (fido_is_error_packet(pong)) {
-        log_fatal("Failed to send ping: Got error response back");
+        log_error("Failed to send ping: Got error response back");
+        return -1;
     }
     log_debug("Pong");
+    return 0;
 }
 
-bool hyperhotp_check_programmed(libusb_device_handle *handle, const FIDOCID cid, char serial[HYPERHOTP_SERIAL_LEN]) {
-    hyperhotp_magic(handle, cid);
+int hyperhotp_check_programmed(libusb_device_handle *handle, const FIDOCID cid, char serial[HYPERHOTP_SERIAL_LEN]) {
+    int err = hyperhotp_magic(handle, cid);
+    if (err != 0) {
+        return -1;
+    }
 
     // Send a packet to get programmed serial
     const uint8_t data[4] = {0x00, 0xe6, 0x00, 0x00};
     const FIDOInitPacket req = fido_craft_packet(cid, U2FHID_ADPU_RAW, 4, data);
-    fido_send_packet(handle, req);
+    err = fido_send_packet(handle, req);
+    if (err != 0) {
+        return -1;
+    }
 
     // Parse response
-    FIDOInitPacket resp = fido_recv_packet(handle);
+    FIDOInitPacket resp;
+    err = fido_recv_packet(handle, &resp);
+    if (err != 0) {
+        return -1;
+    }
     if (fido_is_error_packet(resp)) {
-        log_fatal("Failed to check whether key is programmed: Got error response back");
+        log_error("Failed to check whether key is programmed: Got error response back");
+        return -1;
     }
     // Seems like this byte is always set when a key is programmed
     bool key_programmed = false;
@@ -52,13 +82,15 @@ bool hyperhotp_check_programmed(libusb_device_handle *handle, const FIDOCID cid,
             key_programmed = true;
             break;
         default:
-            log_fatal("Failed to check whether key is programmed: Encountered unexpected value in response");
+            log_error("Failed to check whether key is programmed: Encountered unexpected value in response");
+            return -1;
             break;
     }
     if (key_programmed) {
         memcpy(serial, resp.data + 3, HYPERHOTP_SERIAL_LEN * sizeof(uint8_t));  // NOLINT (GCC doesn't support _s)
+        return 1;
     }
-    return key_programmed;
+    return 0;
 }
 
 static bool hyperhotp_transaction_succeeded(const FIDOInitPacket resp) {
@@ -67,38 +99,49 @@ static bool hyperhotp_transaction_succeeded(const FIDOInitPacket resp) {
     } else if (resp.data[0] == 0x90) {
         return true;
     } else {
-        log_fatal("Unknown bytes in response from device when reading whether reset succeeded");
+        log_error("Unknown bytes in response from device when reading whether reset succeeded");
     }
     return false;
 }
 
-bool hyperhotp_reset(libusb_device_handle *handle, const FIDOCID cid) {
+int hyperhotp_reset(libusb_device_handle *handle, const FIDOCID cid) {
     char serial[HYPERHOTP_SERIAL_LEN];
 
-    if (!hyperhotp_check_programmed(handle, cid, serial)) {
-        log_debug("Device is not programmed, nothing to reset");
-        return false;
-    } else {
+    int programmed = hyperhotp_check_programmed(handle, cid, serial);
+    if (programmed == 0) {
+        log_error("Device is not programmed, nothing to reset");
+        return -1;
+    } else if (programmed == 1) {
         log_debug("Device is programmed, proceeding with reset");
+    } else {
+        return -1;
     }
 
     // Send reset request
     const uint8_t data[4] = {0x00, 0x07, 0x00, 0x00};
     const FIDOInitPacket req = fido_craft_packet(cid, U2FHID_ADPU_RAW, 4, data);
-    fido_send_packet(handle, req);
+    int err = fido_send_packet(handle, req);
+    if (err != 0) {
+        return -1;
+    }
 
     // Check response for success
-    const FIDOInitPacket resp = fido_recv_packet(handle);
+    FIDOInitPacket resp;
+    err = fido_recv_packet(handle, &resp);
+    if (err != 0) {
+        return -1;
+    }
     if (!hyperhotp_transaction_succeeded(resp) || fido_is_error_packet(resp)) {
-        log_fatal("Failed to reset device: Device reported failure (perhaps you didn't push the button?)");
+        log_error("Failed to reset device: Device reported failure (perhaps you didn't push the button?)");
     } else {
-        if (hyperhotp_check_programmed(handle, cid, serial)) {
-            log_fatal("Failed to reset device: Device reported successful reset, but device is not actually reset");
-        } else {
-            return true;
+        programmed = hyperhotp_check_programmed(handle, cid, serial);
+        if (programmed == 1) {
+            log_error("Failed to reset device: Device reported successful reset, but device is not actually reset");
+        } else if (programmed == 0) {
+            return 0;
         }
     }
-    return false;
+    return -1;
 }
 
 static bool ascii_is_hex(const char x) {
@@ -132,17 +175,23 @@ static uint8_t ascii_2_hex(const char a_char, const char b_char) {
     return h;
 }
 
-void hyperhotp_program(libusb_device_handle *handle, const FIDOCID cid, const bool is_8_char_code,
-                       const char serial[HYPERHOTP_SERIAL_LEN], const char seed[HYPERHOTP_SEED_LEN_ASCII]) {
+int hyperhotp_program(libusb_device_handle *handle, const FIDOCID cid, const bool is_8_char_code,
+                      const char serial[HYPERHOTP_SERIAL_LEN], const char seed[HYPERHOTP_SEED_LEN_ASCII]) {
     char curr_serial[HYPERHOTP_SERIAL_LEN];
-    if (hyperhotp_check_programmed(handle, cid, curr_serial)) {
-        log_fatal("Failed to program device: Device is already programmed. Please reset and try again.");
+    int programmed = hyperhotp_check_programmed(handle, cid, curr_serial);
+    if (programmed == 1) {
+        log_error("Failed to program device: Device is already programmed. Please reset and try again.");
+        return -1;
+    } else if (programmed == -1) {
+        log_error("Failed to program device: Could not check whether device is already programmed.");
+        return -1;
     }
 
     // Check whether seed is valid
     for (size_t i = 0; i < HYPERHOTP_SEED_LEN_ASCII; i++) {
         if (!ascii_is_hex(seed[i])) {
-            log_fatal("Failed to program device: Seed contains non-hex characters");
+            log_error("Failed to program device: Seed contains non-hex characters");
+            return -1;
         }
     }
 
@@ -168,21 +217,32 @@ void hyperhotp_program(libusb_device_handle *handle, const FIDOCID cid, const bo
     memcpy(data + 10, hex_seed, HYPERHOTP_SEED_LEN_HEX);  // NOLINT (GCC doesn't support _s)
     memcpy(data + 32, serial, HYPERHOTP_SERIAL_LEN);      // NOLINT (GCC doesn't support _s)
     const FIDOInitPacket req = fido_craft_packet(cid, U2FHID_ADPU_RAW, 0x28, data);
-    fido_send_packet(handle, req);
+    int err = fido_send_packet(handle, req);
+    if (err != 0) {
+        return -1;
+    }
 
     // Check whether programming succeeded
-    const FIDOInitPacket resp = fido_recv_packet(handle);
+    FIDOInitPacket resp;
+    err = fido_recv_packet(handle, &resp);
+    if (err != 0) {
+        return -1;
+    }
     char new_serial[HYPERHOTP_SERIAL_LEN] = {0};
     if (!hyperhotp_transaction_succeeded(resp) || fido_is_error_packet(resp)) {
-        log_fatal("Failed to program device: Device reported failure (perhaps you didn't push the button?)");
-    } else if (!hyperhotp_check_programmed(handle, cid, new_serial)) {
-        log_fatal(
+        log_error("Failed to program device: Device reported failure (perhaps you didn't push the button?)");
+        return -1;
+    } else if (hyperhotp_check_programmed(handle, cid, new_serial) == 0) {
+        log_error(
             "Failed to program device: Device reported successful programming, but device is not actually programmed");
+        return -1;
     } else if (strncmp(serial, new_serial, HYPERHOTP_SERIAL_LEN) != 0) {
-        log_fatal(
+        log_error(
             "Failed to program device: Device reported successful programming, but serial number doesn't match the one "
-            "programmed");
-    } else {
-        printf("Programming complete!\n");
+            "programmed. This is a bug in the programmer.");
+        return -1;
     }
+    return 0;
 }
+
+int hyperhotp_cleanup(libusb_device_handle *handle) { return usb_cleanup(handle); }
