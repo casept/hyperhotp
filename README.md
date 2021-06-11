@@ -19,7 +19,7 @@ This program only depends on `libusb` at runtime, as well as a C compiler suppor
 
 ```shell
 $ mkdir build && cd build
-$ cmake -DBUILD_GUI=ON .. # Alternatively: cmake .. to build without GUI
+$ cmake .. # Alternatively: cmake .. -DBUILD_GUI=ON to build with GUI (unfinished!)
 $ make -j$(nproc)
 ```
 

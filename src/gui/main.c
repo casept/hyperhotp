@@ -1,6 +1,7 @@
 #include <gtk/gtk.h>
 #include <libusb-1.0/libusb.h>
 #include <pthread.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
 
@@ -68,6 +69,28 @@ static void gui_on_exit_due_to_failure_requested(GtkWidget *widget, gpointer dat
     exit(EXIT_FAILURE);
 }
 
+// Displays a modal dialog asking the user to retry.
+// If the user declines, the app is closed.
+static void gui_show_blocking_retry_modal(GtkWidget *parent_window, const char *msg) {
+    const GtkDialogFlags flags = GTK_DIALOG_DESTROY_WITH_PARENT | GTK_DIALOG_MODAL;
+    GtkWidget *dialog =
+        gtk_message_dialog_new(GTK_WINDOW(parent_window), flags, GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE, "%s", msg);
+    GtkWidget *retry_button = gtk_dialog_add_button(GTK_DIALOG(dialog), "Retry", GTK_RESPONSE_ACCEPT);
+    g_signal_connect(retry_button, "clicked", G_CALLBACK(gui_on_retry_requested), NULL);
+    gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_ACCEPT);
+    // Destroy dialog on response
+    g_signal_connect(dialog, "response", G_CALLBACK(gtk_window_destroy), NULL);
+
+    gtk_widget_show(dialog);
+    // This is no doubt not the cleanest or most efficient way,
+    // but it should be fine as a quick&dirty solution.
+    // We don't care about the false case, because then the app will be closed already.
+    while (!GLOBAL_STATE.retry_requested) {
+    }
+    gtk_widget_hide(dialog);
+    g_object_unref(dialog);
+}
+
 // Queries the current device status.
 static void gui_update_device_status(GtkLabel *label_to_update) {
     char serial[HYPERHOTP_SERIAL_LEN];
@@ -82,6 +105,7 @@ static void gui_update_device_status(GtkLabel *label_to_update) {
         gtk_info_bar_add_child(GTK_INFO_BAR(bar), label);
         log_free_error_string(err_str);
     } else {
+        // TODO: Content
         gtk_label_set_markup(label_to_update, "<b>Text to be bold</b>");
     }
     pthread_mutex_unlock(&GLOBAL_STATE.mutex);
@@ -94,30 +118,10 @@ static void gui_init_device_with_retries(GtkWidget *window) {
         int err = hyperhotp_init(&GLOBAL_STATE.device, GLOBAL_STATE.cid);
         if (err != 0) {
             char *err_string = log_get_last_error_string();
-            const GtkDialogFlags flags = GTK_DIALOG_DESTROY_WITH_PARENT | GTK_DIALOG_MODAL;
-            GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), flags, GTK_MESSAGE_ERROR, GTK_BUTTONS_NONE,
-                                                       "%s", err_string);
-            GtkWidget *retry_button = gtk_dialog_add_button(GTK_DIALOG(dialog), "Retry", GTK_RESPONSE_ACCEPT);
-            g_signal_connect(retry_button, "clicked", G_CALLBACK(gui_on_retry_requested), NULL);
-            GtkWidget *exit_button = gtk_dialog_add_button(GTK_DIALOG(dialog), "Exit", GTK_RESPONSE_CLOSE);
-            g_signal_connect(exit_button, "clicked", G_CALLBACK(gui_on_exit_due_to_failure_requested), NULL);
-            gtk_dialog_set_default_response(GTK_DIALOG(dialog), 0);
-            // Destroy dialog on response
-            g_signal_connect(dialog, "response", G_CALLBACK(gtk_window_destroy), NULL);
-            g_signal_connect(dialog, "destroy", G_CALLBACK(gui_on_exit_due_to_failure_requested), NULL);
-
-            gtk_window_present(GTK_WINDOW(dialog));
-            gtk_window_set_modal(GTK_WINDOW(dialog), TRUE);
-            gtk_window_set_transient_for(GTK_WINDOW(dialog), GTK_WINDOW(window));
-
-            // This is no doubt not the cleanest or most efficient way,
-            // but it should be fine as a quick&dirty solution.
-            // We don't care about the false case, because then the app will be closed already.
-            while (!GLOBAL_STATE.retry_requested) {
-            }
-            gtk_window_close(GTK_WINDOW(dialog));
-            gtk_window_destroy(GTK_WINDOW(dialog));
+            gui_show_blocking_retry_modal(window, err_string);
             log_free_error_string(err_string);
+        } else {
+            break;
         }
     }
     pthread_mutex_unlock(&GLOBAL_STATE.mutex);
@@ -173,7 +177,7 @@ static void gui_create(GtkApplication *app, gpointer user_data) {
     gui_init_device_with_retries(window);
     GtkWidget *device_status = gtk_label_new(NULL);
     gtk_box_append(GTK_BOX(box), device_status);
-    gui_update_device_status(GTK_LABEL(device_status));
+    // gui_update_device_status(GTK_LABEL(device_status));
 }
 
 int main(int argc, char **argv) {
