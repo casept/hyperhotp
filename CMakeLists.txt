@@ -60,7 +60,11 @@ find_package(Libusb 1.0 REQUIRED)
 
 target_link_libraries(lib${PROJECT_NAME} PRIVATE Libusb::Libusb)
 target_link_options(lib${PROJECT_NAME} PRIVATE ${DEBUG_LD_OPTS})
-target_link_libraries(${PROJECT_NAME} PRIVATE lib${PROJECT_NAME})
+if(CMAKE_BUILD_STATIC)
+  target_link_libraries(${PROJECT_NAME} PRIVATE lib${PROJECT_NAME} -static)
+else()
+  target_link_libraries(${PROJECT_NAME} PRIVATE lib${PROJECT_NAME})
+endif()
 target_link_options(${PROJECT_NAME} PRIVATE ${DEBUG_LD_OPTS})
 list(APPEND INSTALLABLES ${PROJECT_NAME})
 
