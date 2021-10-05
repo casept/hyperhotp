@@ -36,7 +36,7 @@ jobs:
         cmake --build build
 
     - name: 'Archive production artifacts'
-        uses: actions/upload-artifact@v2
-        with:
-          name: Binary
-          path: build/hyperhotp.exe
+      uses: actions/upload-artifact@v2
+      with:
+        name: hyperhotp.exe
+        path: build/hyperhotp.exe
