@@ -42,15 +42,12 @@ list(
   -Wundef
   -Wunreachable-code
   -Wwrite-strings
-  -fstack-protector-all
+  -fno-stack-protector
   -g
   -O0
   -fdiagnostics-color=always
-  -fsanitize=address
-  -fsanitize=undefined
   -fno-omit-frame-pointer)
-list(APPEND DEBUG_LD_OPTS -fno-omit-frame-pointer -fsanitize=address
-     -fsanitize=undefined)
+list(APPEND DEBUG_LD_OPTS -fno-omit-frame-pointer)
 
 target_compile_options(${PROJECT_NAME} PRIVATE ${DEBUG_FLAGS})
 target_compile_options(lib${PROJECT_NAME} PRIVATE ${DEBUG_FLAGS})
