@@ -1,0 +1,11 @@
+name: "Build"
+on:
+  pull_request:
+  push:
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v2
+    - run: bash ./scripts/ci-install-deps-linux.sh
+    - run: bash ./scripts/ci-build-linux.sh
