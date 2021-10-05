@@ -45,7 +45,7 @@ static void program(libusb_device_handle *handle, const FIDOCID cid, const CLICo
     }
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, const char *argv[]) {
     libusb_device_handle *handle = NULL;
     FIDOCID cid;
     int err = hyperhotp_init(&handle, cid);
