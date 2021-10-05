@@ -34,3 +34,9 @@ jobs:
       run: |
         cmake -B build -DCMAKE_BUILD_TYPE=Release
         cmake --build build
+
+    - name: 'Archive production artifacts'
+        uses: actions/upload-artifact@v2
+        with:
+          name: Binary
+          path: build/hyperhotp.exe
