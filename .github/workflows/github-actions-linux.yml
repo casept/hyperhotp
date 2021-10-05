@@ -13,3 +13,9 @@ jobs:
         fetch-depth: 0
     - run: bash ./scripts/ci-install-deps-linux.sh
     - run: bash ./scripts/ci-build-linux.sh
+
+    - name: 'Archive binaries'
+      uses: actions/upload-artifact@v2
+      with:
+        name: hyperhotp
+        path: build/hyperhotp
