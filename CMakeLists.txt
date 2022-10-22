@@ -78,8 +78,12 @@ endif()
 
 install(
   TARGETS ${INSTALLABLES}
-  CONFIGURATIONS Release
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+  DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+install(
+  FILES ${CMAKE_SOURCE_DIR}/hyperhotp.1
+  DESTINATION share/man/man1/
+)
 
 # Hack to force cmake to add system (libc) header path to compile_commands.json.
 # This also adds a lot of junk, but as long as it doesn't slow clangd too much
