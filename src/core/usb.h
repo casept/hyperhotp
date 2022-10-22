@@ -1,6 +1,6 @@
 #pragma once
 
-#include <libusb-1.0/libusb.h>
+#include <libusb.h>
 
 /*
  * Initialize the hyperFIDO usb device's libusb handle.

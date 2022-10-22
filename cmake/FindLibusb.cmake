@@ -12,14 +12,15 @@ mark_as_advanced(Libusb_VERSION)
 # Find header path
 find_path(
   Libusb_INCLUDE_DIR
-  NAMES libusb-1.0/libusb.h
+  NAMES libusb.h
   HINTS ${PC_Libusb_INCLUDE_DIRS})
 mark_as_advanced(Libusb_INCLUDE_DIR)
 
 # Find lib path
 find_library(
   Libusb_LIBRARIES
-  NAMES usb-1.0
+  # On some platforms (e.g. most Linux) libusb.so is libusb 0. On others (e.g. FreeBSD), it's libusb 1 and libusb-1.0.so does not exist.
+  NAMES usb-1.0 usb
   HINTS ${PC_Libusb_LIBRARY_DIRS})
 mark_as_advanced(Libusb_LIBRARIES)
 

@@ -1,5 +1,5 @@
 #include <gtk/gtk.h>
-#include <libusb-1.0/libusb.h>
+#include <libusb.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>

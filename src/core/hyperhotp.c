@@ -1,6 +1,6 @@
 #include "hyperhotp.h"
 
-#include <libusb-1.0/libusb.h>
+#include <libusb.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
