@@ -58,6 +58,14 @@ Erase the token by issuing a
 command to reset the device, then retry the
 .Cm program
 command.
+.It Device could not be found, perhaps it's not plugged in?
+Plug the device in.
+If it is already plugged in, make sure
+.Nm hyperhotp
+has permissions to access the device.
+Elevate privileges or adjust
+.Xr udev 7
+rules if necessary.
 .It Failed to send ping
 .It Failed to check whether key is programmed
 .It Failed to reset device: Device reported successful reset, but device is not actually reset
@@ -66,7 +74,8 @@ Either your security key or the
 program is defective.  Please report this error to the author.
 .El
 .Sh SEE ALSO
-.Xr libusb 3
+.Xr libusb 3 ,
+.Xr udev 7
 .Sh HISTORY
 This is an open re-implementation of the programming software for the HOTP
 feature of the hyperFIDO security keys.
@@ -85,3 +94,9 @@ accidentally wipe your keys or brick your device. As always, no warranty.
 .Sh BUGS
 Please reports bugs on
 .Lk https://github.com/casept/hyperhotp Github .
+If possible, recompile with
+.Nm cmake
+.Fl DCMAKE_BUILD_TYPE=Debug
+to have
+.Nm hyperhotp
+generate a full trace of the communication with the security key.
