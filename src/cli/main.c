@@ -46,6 +46,17 @@ static void program(libusb_device_handle *handle, const FIDOCID cid, const CLICo
 }
 
 int main(int argc, const char *argv[]) {
+    const CLIConfig cfg = cli_parse(argc, argv);
+    // Special handling for help, as it has to work even when a device is not connected
+    if (cfg.action == CLI_ACTION_INVALID) {
+        cli_print_help(argv[0]);
+        exit(EXIT_FAILURE);
+    }
+    if (cfg.action == CLI_ACTION_HELP) {
+        cli_print_help(argv[0]);
+        exit(EXIT_SUCCESS);
+    }
+
     libusb_device_handle *handle = NULL;
     FIDOCID cid;
     int err = hyperhotp_init(&handle, cid);
@@ -55,15 +66,7 @@ int main(int argc, const char *argv[]) {
         log_free_error_string(msg);
     }
 
-    const CLIConfig cfg = cli_parse(argc, argv);
-
     switch (cfg.action) {
-        case CLI_ACTION_INVALID:
-        case CLI_ACTION_HELP:
-            cli_print_help(argv[0]);
-            usb_cleanup(handle);
-            exit(EXIT_FAILURE);
-            break;
         case CLI_ACTION_CHECK:
             check(handle, cid);
             break;
