@@ -59,8 +59,10 @@ command to reset the device, then retry the
 .Cm program
 command.
 .It Device could not be found, perhaps it's not plugged in?
+.It Failed to claim device from kernel
 Plug the device in.
-If it is already plugged in, make sure
+If it is already plugged in, try wiggling the device or plug it into a different port.
+Make sure
 .Nm hyperhotp
 has permissions to access the device.
 Elevate privileges or adjust
