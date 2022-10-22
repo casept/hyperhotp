@@ -10,7 +10,7 @@ Also, while this only issues FIDO commands to the device which have no relation 
 
 ```shell
 $ ./hyperhotp help
-Usage: ./hyperhotp [help|check|reset|program] <8-character serial number> <40-character hex seed> <whether to generate 6-character (false) or 8-character (true) HOTP codes>
+Usage: ./hyperhotp [help|check|reset|program] [-68] <8-character serial number> <40-character hex seed>
 ```
 
 For full usage, see the man page `hyperhotp(1)`.
