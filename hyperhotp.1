@@ -1,0 +1,87 @@
+.Dd 2022/10/22
+.Dt HYPERHOTP 1
+.Os
+.Sh NAME
+.Nm hyperhotp
+.Nd program hyperFIDO USB security key HOTP feature
+.Sh SYNOPSIS
+.Nm hyperhotp
+.Cm ( check | help | reset )
+.Nm hyperhotp
+.Cm program
+.Fl [ 6 | 8 ]
+.Ar serial_number hex_seed
+.Sh DESCRIPTION
+The
+.Nm hyperhotp
+utility programs the HOTP feature of hyperFIDO USB security keys.
+The following commands are implemented:
+.Bl -tag -width Ds
+.It Cm check
+Check if the security key has already been programmed with a token.
+If yes, print the serial number of the token.
+.It Cm help
+Print a short help text.
+.It Cm reset
+Clear the token programmed into the security key.
+To confirm the process, press the button on the security key when it is
+flashing.
+.It Cm program Fl [ 6 | 8 ] Ar serial_number hex_seed
+Program the security key with a token generated from the given 40\~digit hexadecimal
+.Ar hex_seed .
+The token will have the given 8\~digit decimal
+.Ar serial_number .
+To confirm the process, press the button on the security key when it is
+flashing.
+The options
+.Fl 6
+and
+.Fl 8
+select 6-byte or 6-byte tokens respectively with
+6-byte tokens being the default.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh DIAGNOSTICS
+.Bl -diag
+.It Failed to reset device: Device reported failure
+In a
+.Cm reset
+or
+.Cm program
+operation, you did not press the button to confirm the operation.
+Restart the operation and press the button when it flashed.
+.It Failed to program device: Device is already programmed.
+The security key has already been programmed with a token.
+Erase the token by issuing a
+.Cm reset
+command to reset the device, then retry the
+.Cm program
+command.
+.It Failed to send ping
+.It Failed to check whether key is programmed
+.It Failed to reset device: Device reported successful reset, but device is not actually reset
+Either your security key or the
+.Nm hyperhotp
+program is defective.  Please report this error to the author.
+.El
+.Sh SEE ALSO
+.Xr libusb 3
+.Sh HISTORY
+This is an open re-implementation of the programming software for the HOTP
+feature of the hyperFIDO security keys.
+It is based on reverse-engineering the Windows-based programmer available
+on
+.Lk https://www.hypersecu.com/downloads "Hypersecu's website" .
+.Sh AUTHOR
+.An Davids Paskevics Aq Mt davids.paskevics@gmail.com
+.Sh CAVEATS
+While I have tested this with my key, I do not know how well it works for
+other models or even other devices of the same model.
+
+Also, while this only issues FIDO commands to the device which have no
+relation to managing U2F credentials, I cannot claim that this will not
+accidentally wipe your keys or brick your device. As always, no warranty.
+.Sh BUGS
+Please reports bugs on
+.Lk https://github.com/casept/hyperhotp Github .
