@@ -13,9 +13,11 @@ $ ./hyperhotp help
 Usage: ./hyperhotp [help|check|reset|program] <8-character serial number> <40-character hex seed> <whether to generate 6-character (false) or 8-character (true) HOTP codes>
 ```
 
+For full usage, see the man page `hyperhotp(1)`.
+
 ## Building
 
-This program only depends on `libusb` at runtime, as well as a C compiler supporting at least `c11` and `cmake` at build time. `gtk4` is also required if you want to build the GUI. On Unixoid platforms the build is done as usual:
+This program only depends on `libusb` at runtime, as well as a C compiler supporting at least `c11`, as well as `pkg-config` and `cmake` at build time. `gtk4` is also required if you want to build the GUI. On Unixoid platforms the build is done as usual:
 
 ```shell
 $ mkdir build && cd build
@@ -26,6 +28,10 @@ $ make -j$(nproc)
 If you have [Nix](https://nixos.org/download.html) installed you can simply open a `nix-shell` to get the exact environment this was developed in.
 
 Building on Windows should also work, but hasn't been tested.
+
+## Packaging status
+
+[![Repology](https://repology.org/badge/vertical-allrepos/hyperhotp.svg)](https://repology.org/project/hyperhotp/versions)
 
 ## TODO (PRs welcome!)
 
