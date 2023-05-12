@@ -29,11 +29,13 @@ jobs:
           mingw-w64-x86_64-cmake
           mingw-w64-x86_64-ninja
           mingw-w64-x86_64-libusb
-          mingw-w64-x86_64-sdl2
+          mingw-w64-x86_64-SDL2
+          mingw-w64-x86_64-gles-headers
+          mingw-w64-x86_64-angleproject
 
     - name: 'Build'
       run: |
-        cmake -B build -DCMAKE_BUILD_TYPE=Release
+        cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_GUI=ON
         cmake --build build
 
     - name: 'Archive CLI binary'
