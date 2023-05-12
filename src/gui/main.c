@@ -40,6 +40,38 @@ static bool disableable_button(struct nk_context *ctx, const char *label, nk_boo
     }
 }
 
+static bool ShowPopup = false;
+static const char *PopupTitle = NULL;
+static const char *PopupMsg = NULL;
+
+static void popup(struct nk_context *ctx, const char *title, const char *msg) {
+    ShowPopup = true;
+    PopupTitle = title;
+    PopupMsg = msg;
+}
+
+/// Ensure popup is shown if it's currently active
+static void do_popup(struct nk_context *ctx) {
+    if (ShowPopup) {
+        // Nice and centered in the window
+        struct nk_rect s = {(int)(WINDOW_WIDTH / 4), (int)(WINDOW_HEIGHT / 4), (int)(WINDOW_WIDTH / 2),
+                            (int)(WINDOW_HEIGHT / 2)};
+        NK_ASSERT(PopupTitle != NULL);
+        if (nk_popup_begin(ctx, NK_POPUP_DYNAMIC, PopupTitle, NK_WINDOW_CLOSABLE, s)) {
+            if (PopupMsg != NULL) {
+                nk_layout_row_dynamic(ctx, 0, 1);
+                nk_label(ctx, PopupMsg, NK_LEFT);
+            }
+            nk_popup_end(ctx);
+        } else {
+            // Popup dismissed, cleanup
+            ShowPopup = false;
+            PopupTitle = false;
+            PopupMsg = false;
+        }
+    }
+}
+
 static char NewSerial[HYPERHOTP_SERIAL_LEN + 1] = {0};
 static char NewSeed[HYPERHOTP_SEED_LEN_ASCII + 1] = {0};
 
@@ -56,6 +88,8 @@ static void main_loop(struct nk_context *ctx, nk_bool *running, SDL_Window **win
 
     /* GUI */
     if (nk_begin(ctx, WINDOW_TITLE, nk_rect(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT), 0)) {
+        do_popup(ctx);
+
         // Display information about the device
         nk_layout_row_dynamic(ctx, 0, 2);
         char serial[HYPERHOTP_SERIAL_LEN] = {0};
@@ -73,7 +107,10 @@ static void main_loop(struct nk_context *ctx, nk_bool *running, SDL_Window **win
         // Button for clearing the device
         nk_layout_row_dynamic(ctx, 0, 1);
         if (disableable_button(ctx, "Reset", programmed)) {
+            popup(ctx, "Reset", "Press button on device!");  // TODO: Short-circuit code on first execution here, so
+                                                             // popup is shown before blocking on button press
             if (hyperhotp_reset(handle, cid) == 0) {
+                popup(ctx, "Reset", "OK!");
                 printf("Reset complete!\n");
             } else {
                 char *err_str = log_get_last_error_string();
@@ -92,12 +129,13 @@ static void main_loop(struct nk_context *ctx, nk_bool *running, SDL_Window **win
         nk_label(ctx, "New hex seed:", NK_LEFT);
         nk_edit_string_zero_terminated(ctx, NK_EDIT_BOX | NK_EDIT_AUTO_SELECT, NewSeed, sizeof(NewSeed), nk_filter_hex);
 
-        // TODO: Sanitize inputs
         nk_bool programming_enabled = (strnlen(NewSerial, HYPERHOTP_SERIAL_LEN) == HYPERHOTP_SERIAL_LEN) &&
                                       (strnlen(NewSeed, HYPERHOTP_SEED_LEN_ASCII) == HYPERHOTP_SEED_LEN_ASCII);
         // TODO: 8 vs 6 char code check
         nk_layout_row_dynamic(ctx, 0, 1);
         if (disableable_button(ctx, "Program", programming_enabled)) {
+            popup(ctx, "Program", "Press button on device!");  // TODO: Short-circuit code on first execution here, so
+                                                               // popup is shown before blocking on button press
             const int err = hyperhotp_program(handle, cid, true, NewSerial, NewSeed);
             if (err != 0) {
                 char *err_str = log_get_last_error_string();
@@ -105,7 +143,7 @@ static void main_loop(struct nk_context *ctx, nk_bool *running, SDL_Window **win
                 log_free_error_string(err_str);
                 exit(EXIT_FAILURE);
             } else {
-                printf("Programming complete!\n");
+                popup(ctx, "Program", "OK!");
             }
         }
     }
