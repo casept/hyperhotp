@@ -3,6 +3,6 @@ stdenv.mkDerivation {
   name = "hyperhotp";
   src = ./.;
   nativeBuildInputs = [ cmake pkg-config ];
-  buildInputs = [ libusb ];
+  buildInputs = [ libusb1 ];
   cmakeFlags = [ ] ++ lib.optional static [ "-DCMAKE_BUILD_STATIC=ON" ];
 }

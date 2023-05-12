@@ -1,19 +1,13 @@
-let
-  sources = import ./nix/sources.nix;
-  pkgs = import sources.nixpkgs { };
-in pkgs.mkShell {
-  buildInputs = [
-    pkgs.niv
-    pkgs.usbutils
-
+{ pkgs ? import <nixpkgs> { } }:
+pkgs.mkShell {
+  nativeBuildInputs = [
     pkgs.gcc
     pkgs.gnumake
     pkgs.pkg-config
     pkgs.cmake
     pkgs.cmake-format
     pkgs.bash
-    pkgs.libusb
-    pkgs.gtk4
+    pkgs.libusb1
 
     pkgs.gdb
     pkgs.valgrind

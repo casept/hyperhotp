@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.21 FATAL_ERROR)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
 
@@ -12,78 +12,35 @@ project(
   DESCRIPTION
     "Open source programmer for the HOTP feature of Hypersecu USB tokens"
   LANGUAGES C)
+
 # Library for features shared between CLI and GUI
-add_library(
-  lib${PROJECT_NAME} STATIC "src/core/log.c" "src/core/usb.c"
-                            "src/core/u2fhid.c" "src/core/hyperhotp.c")
-# CLI
-add_executable(${PROJECT_NAME} "src/cli/main.c" "src/cli/cli.c")
-# GUI
-
-target_compile_features(lib${PROJECT_NAME} PUBLIC c_std_11)
-target_compile_features(${PROJECT_NAME} PRIVATE c_std_11)
-# TODO: Fix for clang/MSVC
-list(
-  APPEND
-  DEBUG_FLAGS
-  -Wall
-  -Wextra
-  -Wpedantic
-  -Wcast-align
-  -Wcast-qual
-  -Wformat=2
-  -Winit-self
-  -Wlogical-op
-  -Wredundant-decls
-  -Wshadow
-  -Wsign-conversion
-  -Wstrict-overflow=5
-  -Wswitch-default
-  -Wundef
-  -Wunreachable-code
-  -Wwrite-strings
-  -fno-stack-protector
-  -g
-  -O0
-  -fdiagnostics-color=always
-  -fno-omit-frame-pointer)
-list(APPEND DEBUG_LD_OPTS -fno-omit-frame-pointer)
-
-target_compile_options(${PROJECT_NAME} PRIVATE ${DEBUG_FLAGS})
-target_compile_options(lib${PROJECT_NAME} PRIVATE ${DEBUG_FLAGS})
-
-# 3rd-party deps
+add_library(hyperhotp_core STATIC "src/core/log.c" "src/core/usb.c"
+                                  "src/core/u2fhid.c" "src/core/hyperhotp.c")
+target_compile_features(hyperhotp_core PUBLIC c_std_11)
+set_target_properties(hyperhotp_core PROPERTIES OUTPUT_NAME "hyperhotp_core")
 find_package(Libusb 1.0 REQUIRED)
+target_link_libraries(hyperhotp_core PUBLIC Libusb::Libusb)
 
-target_link_libraries(lib${PROJECT_NAME} PUBLIC Libusb::Libusb)
-target_link_options(lib${PROJECT_NAME} PRIVATE ${DEBUG_LD_OPTS})
-if(CMAKE_BUILD_STATIC)
-	target_link_libraries(${PROJECT_NAME} PRIVATE lib${PROJECT_NAME} -static)
-else()
-	target_link_libraries(${PROJECT_NAME} PRIVATE lib${PROJECT_NAME})
-endif()
-target_link_options(${PROJECT_NAME} PRIVATE ${DEBUG_LD_OPTS})
-list(APPEND INSTALLABLES ${PROJECT_NAME})
+# CLI
+add_executable(hyperhotp_cli "src/cli/main.c" "src/cli/cli.c")
+set_target_properties(hyperhotp_cli PROPERTIES OUTPUT_NAME "hyperhotp")
+target_link_libraries(hyperhotp_cli PRIVATE hyperhotp_core)
 
 # GUI (Optional)
 if(BUILD_GUI)
-  find_package(GTK 4 REQUIRED)
-  add_executable(${PROJECT_NAME}_gui "src/gui/main.c")
-  target_compile_features(${PROJECT_NAME}_gui PRIVATE c_std_11)
-  target_compile_options(${PROJECT_NAME}_gui PRIVATE ${DEBUG_FLAGS})
-  target_link_libraries(${PROJECT_NAME}_gui PRIVATE GTK::GTK lib${PROJECT_NAME})
-  target_link_options(${PROJECT_NAME}_gui PRIVATE ${DEBUG_LD_OPTS})
-  list(APPEND INSTALLABLES ${PROJECT_NAME}_gui)
+  find_package(SDL2 REQUIRED)
+  find_package(OpenGLES2 REQUIRED)
+  find_library(LIBM_LIBRARIES m REQUIRED)
+  add_executable(hyperhotp_gui "src/gui/main.c")
+  target_compile_features(hyperhotp_gui PRIVATE c_std_11)
+  target_link_libraries(hyperhotp_gui PRIVATE SDL2::SDL2 OpenGLES2::OpenGLES2
+                                              ${LIBM_LIBRARIES} hyperhotp_core)
+  list(APPEND INSTALLABLES hyperhotp_gui)
 endif()
 
-install(
-  TARGETS ${INSTALLABLES}
-  DESTINATION ${CMAKE_INSTALL_BINDIR}
-)
-install(
-  FILES ${CMAKE_SOURCE_DIR}/hyperhotp.1
-  DESTINATION share/man/man1/
-)
+# Install executables and the man page
+install(TARGETS ${INSTALLABLES} DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(FILES ${CMAKE_SOURCE_DIR}/hyperhotp.1 DESTINATION share/man/man1/)
 
 # Hack to force cmake to add system (libc) header path to compile_commands.json.
 # This also adds a lot of junk, but as long as it doesn't slow clangd too much
@@ -94,10 +51,9 @@ if(CMAKE_EXPORT_COMPILE_COMMANDS)
 endif()
 
 # Define DEBUG macro in debug builds
-target_compile_definitions(lib${PROJECT_NAME}
-                           PRIVATE "$<$<CONFIG:DEBUG>:DEBUG>")
-target_compile_definitions(${PROJECT_NAME} PRIVATE "$<$<CONFIG:DEBUG>:DEBUG>")
+target_compile_definitions(hyperhotp_core PRIVATE "$<$<CONFIG:DEBUG>:DEBUG>")
+target_compile_definitions(hyperhotp_cli PRIVATE "$<$<CONFIG:DEBUG>:DEBUG>")
 if(BUILD_GUI)
-  target_compile_definitions(${PROJECT_NAME}_gui
-                             PRIVATE "$<$<CONFIG:DEBUG>:DEBUG>")
+  target_compile_definitions(hyperhotp_gui PRIVATE "$<$<CONFIG:DEBUG>:DEBUG>
+  ")
 endif()
