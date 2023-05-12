@@ -2,5 +2,5 @@
 set -eo pipefail
 
 mkdir build && cd build
-cmake ..
+cmake -DBUILD_GUI=ON ..
 make -j"$(nproc)"

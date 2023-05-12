@@ -29,14 +29,21 @@ jobs:
           mingw-w64-x86_64-cmake
           mingw-w64-x86_64-ninja
           mingw-w64-x86_64-libusb
+          mingw-w64-x86_64-sdl2
 
     - name: 'Build'
       run: |
         cmake -B build -DCMAKE_BUILD_TYPE=Release
         cmake --build build
 
-    - name: 'Archive binaries'
+    - name: 'Archive CLI binary'
       uses: actions/upload-artifact@v2
       with:
         name: hyperhotp.exe
         path: build/hyperhotp.exe
+
+    - name: 'Archive GUI binary'
+      uses: actions/upload-artifact@v2
+      with:
+        name: hyperhotp_gui.exe
+        path: build/hyperhotp_gui.exe

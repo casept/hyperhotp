@@ -5,7 +5,7 @@ on:
   push:
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
     - name: '🧰 Checkout'
       uses: actions/checkout@v2
@@ -14,8 +14,14 @@ jobs:
     - run: bash ./scripts/ci-install-deps-linux.sh
     - run: bash ./scripts/ci-build-linux.sh
 
-    - name: 'Archive binaries'
+    - name: 'Archive CLI binary'
       uses: actions/upload-artifact@v2
       with:
         name: hyperhotp
         path: build/hyperhotp
+
+    - name: 'Archive GUI binary'
+      uses: actions/upload-artifact@v2
+      with:
+        name: hyperhotp_gui
+        path: build/hyperhotp_gui
